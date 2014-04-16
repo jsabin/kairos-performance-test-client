@@ -1,31 +1,29 @@
 import org.kairosdb.client.Client;
 import org.kairosdb.client.HttpClient;
-import org.kairosdb.client.builder.*;
-import org.kairosdb.client.response.Queries;
-import org.kairosdb.client.response.QueryResponse;
-import org.kairosdb.client.response.Results;
+import org.kairosdb.client.TelnetClient;
+import org.kairosdb.client.builder.Metric;
+import org.kairosdb.client.builder.MetricBuilder;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
-import java.util.Date;
-import java.util.List;
 import java.util.Random;
 
 public class Main
 {
 	public static void main(String[] args) throws InterruptedException, IOException, URISyntaxException
 	{
-		// todo Want a telnet client as well - add this the client
-
+		String clientType = args[0];
+		int numThreads = Integer.parseInt(args[1]);
+		int minutes = Integer.parseInt(args[2]);
 		long count = 0;
-		Client client = new HttpClient("http://localhost:8080");
+//		Client client = new HttpClient("http://localhost:8080");
 
 		long startTime = System.currentTimeMillis();
 
-		DataBlaster[] threads = new DataBlaster[80];
-		for(int i = 0; i < threads.length; i++)
+		DataBlaster[] threads = new DataBlaster[numThreads];
+		for (int i = 0; i < threads.length; i++)
 		{
-			threads[i] = new DataBlaster();
+			threads[i] = new DataBlaster(clientType, minutes);
 		}
 
 		for (Thread thread : threads)
@@ -77,17 +75,30 @@ public class Main
 //		}
 		System.out.println("Data points/sec = " + ((count * 1000) / (System.currentTimeMillis() - startTime)));
 
-		client.shutdown();
+//		client.shutdown();
 	}
 
 	private static class DataBlaster extends Thread
 	{
-		private Client client;
+		private String clientType;
+		private HttpClient httpClient;
+		private TelnetClient telnetClient;
+		private int minutes;
 		private long dpCount;
 
-		private DataBlaster()
+		private DataBlaster(String clientType, int minutes) throws IOException
 		{
-			client = new HttpClient("http://localhost:8080");
+			this.clientType = clientType;
+			this.minutes = minutes;
+
+			if (clientType.equals("http"))
+			{
+				httpClient = new HttpClient("http://localhost:8080");
+			}
+			else
+			{
+				telnetClient = new TelnetClient("localhost", 4242);
+			}
 		}
 
 		public long getDpCount()
@@ -104,7 +115,7 @@ public class Main
 
 				long startTime = System.currentTimeMillis();
 				long timestamp = 0;
-				while (timestamp < (startTime + 1000 * 60 * 5)) // go for five minutes
+				while (timestamp < (startTime + 1000 * 60 * minutes))
 				{
 					MetricBuilder builder = MetricBuilder.getInstance();
 
@@ -118,7 +129,14 @@ public class Main
 						dpCount++;
 					}
 
-					client.pushMetrics(builder);
+					if (clientType.equals("http"))
+					{
+						httpClient.pushMetrics(builder);
+					}
+					else
+					{
+						telnetClient.pushMetrics(builder);
+					}
 				}
 			}
 			catch (Exception e)
@@ -127,7 +145,12 @@ public class Main
 			}
 			try
 			{
-				client.shutdown();
+				if (clientType.equals("http"))
+				{
+					httpClient.shutdown();
+				}
+				else
+					telnetClient.shutdown();
 			}
 			catch (IOException e)
 			{
