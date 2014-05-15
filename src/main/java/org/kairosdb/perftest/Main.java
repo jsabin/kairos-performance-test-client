@@ -1,4 +1,5 @@
-import org.kairosdb.client.Client;
+package org.kairosdb.perftest;
+
 import org.kairosdb.client.HttpClient;
 import org.kairosdb.client.TelnetClient;
 import org.kairosdb.client.builder.Metric;
@@ -12,9 +13,10 @@ public class Main
 {
 	public static void main(String[] args) throws InterruptedException, IOException, URISyntaxException
 	{
-		String clientType = args[0];
-		int numThreads = Integer.parseInt(args[1]);
-		int minutes = Integer.parseInt(args[2]);
+		String host = args[0];
+		String clientType = args[1];
+		int numThreads = Integer.parseInt(args[2]);
+		int minutes = Integer.parseInt(args[3]);
 		long count = 0;
 //		Client client = new HttpClient("http://localhost:8080");
 
@@ -23,7 +25,7 @@ public class Main
 		DataBlaster[] threads = new DataBlaster[numThreads];
 		for (int i = 0; i < threads.length; i++)
 		{
-			threads[i] = new DataBlaster(clientType, minutes);
+			threads[i] = new DataBlaster(host, clientType, minutes);
 		}
 
 		for (Thread thread : threads)
@@ -86,18 +88,18 @@ public class Main
 		private int minutes;
 		private long dpCount;
 
-		private DataBlaster(String clientType, int minutes) throws IOException
+		private DataBlaster(String host, String clientType, int minutes) throws IOException
 		{
 			this.clientType = clientType;
 			this.minutes = minutes;
 
 			if (clientType.equals("http"))
 			{
-				httpClient = new HttpClient("http://localhost:8080");
+				httpClient = new HttpClient(host);
 			}
 			else
 			{
-				telnetClient = new TelnetClient("localhost", 4242);
+				telnetClient = new TelnetClient(host, 4242);
 			}
 		}
 
@@ -150,7 +152,9 @@ public class Main
 					httpClient.shutdown();
 				}
 				else
+				{
 					telnetClient.shutdown();
+				}
 			}
 			catch (IOException e)
 			{
